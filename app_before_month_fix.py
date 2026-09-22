@@ -67,46 +67,13 @@ def latest_mom(summary: pd.DataFrame) -> float | None:
     return (current / previous - 1) * 100
 
 
-def complete_month_axis(
-    summary: pd.DataFrame,
-    start_month: int,
-    end_month: int,
-    group_column: str | None = None,
-) -> pd.DataFrame:
-    """Add missing months as null rows so charts show gaps instead of zeros."""
-    months = pd.DataFrame({"월": range(start_month, end_month + 1)})
-    prepared = summary.copy()
-    prepared["월"] = prepared["기준월"].dt.month
-
-    if group_column is None:
-        completed = months.merge(
-            prepared[["월", "전체물동량"]],
-            on="월",
-            how="left",
-        )
-    else:
-        groups = sorted(prepared[group_column].dropna().unique().tolist())
-        grid = pd.MultiIndex.from_product(
-            [months["월"], groups],
-            names=["월", group_column],
-        ).to_frame(index=False)
-        completed = grid.merge(
-            prepared[["월", group_column, "전체물동량"]],
-            on=["월", group_column],
-            how="left",
-        )
-
-    completed["월라벨"] = completed["월"].astype(str) + "월"
-    return completed
-
-
 def line_chart(summary: pd.DataFrame, color: str | None = None) -> alt.Chart:
     encodings: dict[str, alt.Encoding] = {
         "x": alt.X(
-            "월라벨:N",
+            "월:O",
             title=None,
-            sort=alt.EncodingSortField(field="월", order="ascending"),
-            axis=alt.Axis(labelAngle=0),
+            sort="ascending",
+            axis=alt.Axis(labelExpr="datum.label + '월'")
         ),
         "y": alt.Y(
             "전체물동량:Q",
@@ -115,7 +82,7 @@ def line_chart(summary: pd.DataFrame, color: str | None = None) -> alt.Chart:
             scale=alt.Scale(zero=False),
         ),
         "tooltip": [
-            alt.Tooltip("월라벨:N", title="기준월"),
+            alt.Tooltip("월:O", title="기준월")
             alt.Tooltip("전체물동량:Q", title="전체 물동량", format=",.0f"),
         ],
     }
@@ -231,16 +198,23 @@ if filtered.empty:
     st.stop()
 
 
-month_data = monthly_summary(filtered)
-month_chart_data = complete_month_axis(
-    month_data,
-    month_range[0],
-    month_range[1],
+month_chart_data = monthly_summary(filtered)
+month_values = month_chart_data.copy()
+month_values["월"] = month_values["기준월"].dt.month
+
+month_chart_data = pd.DataFrame({
+    "월": range(month_range[0], month_range[1] + 1)
+})
+
+month_chart_data = month_chart_data.merge(
+    month_values[["월", "전체물동량"]],
+    on="월",
+    how="left"
 )
 total_volume = float(filtered["전체물동량"].sum())
 total_containers = int(filtered["전체개수"].sum())
-month_average = float(month_data["전체물동량"].mean())
-mom = latest_mom(month_data)
+month_average = float(month_chart_data["전체물동량"].mean())
+mom = latest_mom(month_chart_data)
 transshipment_volume = float(
     filtered.loc[
         filtered["수출입구분명"].isin(["수출환적", "수입환적"]),
@@ -262,7 +236,7 @@ with st.container(horizontal=True):
         "전체 물동량",
         format_number(total_volume),
         border=True,
-        chart_data=month_data["전체물동량"].tolist(),
+        chart_data=month_chart_data["전체물동량"].tolist(),
         chart_type="line",
     )
     st.metric("전체 컨테이너 개수", format_number(total_containers), border=True)
@@ -291,10 +265,6 @@ trend_tab, port_trend_tab = st.tabs(["전체 월별 추이", "청코드별 월�
 with trend_tab:
     with st.container(border=True):
         st.altair_chart(line_chart(month_chart_data))
-        st.caption(
-            "선이 없는 월은 원천 데이터에 해당 조건의 행이 없다는 뜻입니다. "
-            "미운영이나 물동량 0으로 단정하지 않습니다."
-        )
 
 with port_trend_tab:
     port_month = (
@@ -302,18 +272,8 @@ with port_trend_tab:
         .agg(전체물동량=("전체물동량", "sum"))
         .sort_values("기준월")
     )
-    port_month_chart = complete_month_axis(
-        port_month,
-        month_range[0],
-        month_range[1],
-        group_column="청코드",
-    )
     with st.container(border=True):
-        st.altair_chart(line_chart(port_month_chart, color="청코드"))
-        st.caption(
-            "선이 없는 월은 원천 데이터에 해당 조건의 행이 없다는 뜻입니다. "
-            "미운영이나 물동량 0으로 단정하지 않습니다."
-        )
+        st.altair_chart(line_chart(port_month, color="청코드"))
 
 
 left, right = st.columns([3, 2])
