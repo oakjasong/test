@@ -34,19 +34,19 @@ def load_data(path: Path) -> pd.DataFrame:
     return frame
 
 
-def format_number(value: float) -> str:
+def format_number(value: float):
     return f"{value:,.0f}"
 
 
-def format_percent(value: float) -> str:
+def format_percent(value: float):
     return f"{value:.1f}%"
 
 
-def share(numerator: float, denominator: float) -> float:
+def share(numerator: float, denominator: float):
     return numerator / denominator * 100 if denominator else 0.0
 
 
-def monthly_summary(frame: pd.DataFrame) -> pd.DataFrame:
+def monthly_summary(frame: pd.DataFrame):
     return (
         frame.groupby("기준월", as_index=False)
         .agg(
@@ -57,7 +57,7 @@ def monthly_summary(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def latest_mom(summary: pd.DataFrame) -> float | None:
+def latest_mom(summary: pd.DataFrame):
     if len(summary) < 2:
         return None
     previous = summary.iloc[-2]["전체물동량"]
@@ -72,8 +72,8 @@ def complete_month_axis(
     start_month: int,
     end_month: int,
     group_column: str | None = None,
-) -> pd.DataFrame:
-    """Add missing months as null rows so charts show gaps instead of zeros."""
+):
+
     months = pd.DataFrame({"월": range(start_month, end_month + 1)})
     prepared = summary.copy()
     prepared["월"] = prepared["기준월"].dt.month
