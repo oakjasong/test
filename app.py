@@ -201,13 +201,6 @@ with st.sidebar:
         default=all_load_statuses,
     )
 
-    if st.button(":material/restart_alt: 필터 초기화", width="stretch"):
-        st.session_state.clear()
-        st.rerun()
-
-    st.divider()
-    st.caption("원천 데이터: 외내항.csv · 2024년 외항 컨테이너 실적")
-
 
 filtered = df[
     df["월"].between(month_range[0], month_range[1])
