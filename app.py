@@ -326,11 +326,17 @@ with left:
             .agg(
                 전체물동량=("전체물동량", "sum"),
                 전체개수=("전체개수", "sum"),
+                컨테이너40피트=("컨테이너수(40피트)", "sum"),
             )
             .sort_values("전체물동량", ascending=False)
         )
         facility_summary["점유율"] = (
             facility_summary["전체물동량"] / total_volume * 100
+        )
+        facility_summary["40피트비중"] = (
+            facility_summary["컨테이너40피트"]
+            / facility_summary["전체개수"]
+            * 100
         )
         facility_top10 = facility_summary.head(10)
         st.altair_chart(
@@ -389,6 +395,62 @@ with right:
         st.caption(
             f"환적 물동량은 {format_number(transshipment_volume)}이며 "
             f"전체의 {share(transshipment_volume, total_volume):.1f}%입니다."
+        )
+
+
+with st.container(border=True):
+    st.subheader("시설 TOP 10의 40피트 비중과 물동량")
+
+    regression_base = alt.Chart(facility_top10).encode(
+        x=alt.X(
+            "40피트비중:Q",
+            title="40피트 컨테이너 비중 (%)",
+            scale=alt.Scale(zero=False),
+        ),
+        y=alt.Y(
+            "전체물동량:Q",
+            title="전체 물동량",
+            axis=alt.Axis(format="~s"),
+            scale=alt.Scale(zero=False),
+        ),
+    )
+
+    points = regression_base.mark_circle(
+        size=120,
+        color="#2878B5",
+    ).encode(
+        tooltip=[
+            alt.Tooltip("시설명:N", title="시설"),
+            alt.Tooltip("40피트비중:Q", title="40피트 비중", format=".1f"),
+            alt.Tooltip("전체물동량:Q", title="전체 물동량", format=",.0f"),
+        ]
+    )
+
+    labels = regression_base.mark_text(
+        align="left",
+        dx=7,
+        dy=-7,
+    ).encode(text="시설명:N")
+
+    if len(facility_top10) >= 2 and facility_top10["40피트비중"].nunique() >= 2:
+        regression_line = (
+            regression_base.transform_regression(
+                "40피트비중",
+                "전체물동량",
+            ).mark_line(
+                color="violet",
+                strokeWidth=3,
+            )
+        )
+        regression_chart = (
+            points + labels + regression_line
+        ).properties(height=CHART_HEIGHT)
+        correlation = facility_top10["40피트비중"].corr(
+            facility_top10["전체물동량"]
+        )
+        st.altair_chart(regression_chart)
+        st.caption(
+            f"40피트 비중과 전체 물동량의 상관계수는 {correlation:.2f}입니다."
         )
 
 
@@ -490,6 +552,4 @@ with st.container(border=True):
             "점유율": st.column_config.NumberColumn(format="%.1f%%"),
         },
     )
-
-
 
